@@ -1,4 +1,7 @@
 const express = require("express");
+console.log("ENV CHECK - MY_MAIN_NUMBER:", process.env.MY_MAIN_NUMBER ? "SET" : "NOT SET");
+console.log("ENV CHECK - ANTHROPIC_KEY:", process.env.ANTHROPIC_KEY ? "SET" : "NOT SET");
+console.log("ENV CHECK - WA_TOKEN:", process.env.WA_TOKEN ? "SET" : "NOT SET");
 const axios = require("axios");
 const app = express();
 app.use(express.json());

@@ -377,8 +377,19 @@ function isTenonTeam(senderName, senderId) {
 app.post("/message", async (req, res) => {
   res.sendStatus(200);
   try {
-    const { text, sender, app } = req.body;
-    if (!text || !sender) return;
+    let text = req.body?.text || req.body?.message || "";
+    let sender = req.body?.sender || req.body?.title || "Unknown";
+
+    // If Tasker variables were not resolved, log raw body
+    if (!text || text === "%NTTEXT" || text.startsWith("%NT")) {
+      console.log("RAW BODY:", JSON.stringify(req.body));
+      console.log("RAW QUERY:", JSON.stringify(req.query));
+      // Try query params as fallback
+      text = req.query?.text || "";
+      sender = req.query?.sender || "Unknown";
+    }
+
+    if (!text || text.startsWith("%NT")) return;
 
     console.log(`📨 Tasker message from ${sender}: ${text.substring(0, 80)}`);
 

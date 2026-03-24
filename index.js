@@ -370,6 +370,77 @@ function isTenonTeam(senderName, senderId) {
   );
 }
 
+// ─── TASKER MESSAGE ENDPOINT ──────────────────────────────────────────────
+app.post("/message", async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const { text, sender, app } = req.body;
+    if (!text || !sender) return;
+
+    console.log(`📨 Tasker message from ${sender}: ${text.substring(0, 80)}`);
+
+    // Ignore status messages and non-content
+    if (text.length < 3) return;
+
+    // Determine if client or internal group based on sender name
+    const isInternal = TENON_TEAM_IDENTIFIERS.some(name =>
+      sender?.toLowerCase().includes(name.toLowerCase())
+    );
+
+    // Analyze with Claude
+    const analysis = await analyzeMessage(text, isInternal ? "internal" : "client");
+
+    // Check if you are mentioned
+    const taggedMe = text.toLowerCase().includes("mayank");
+
+    // Send immediate alert if critical or tagged
+    if (taggedMe) {
+      await sendAlertToMe(
+        `📌 *YOU WERE MENTIONED*\n\n` +
+        `*From:* ${sender}\n` +
+        `*Message:* ${text}`
+      );
+    } else if (!isInternal && analysis.isCritical) {
+      await sendAlertToMe(
+        `🔴 *CRITICAL CLIENT MESSAGE*\n\n` +
+        `*From:* ${sender}\n` +
+        `*Message:* ${text}\n\n` +
+        `*Why:* ${analysis.reason}`
+      );
+    } else if (isInternal && analysis.isAsk) {
+      // Track internal asks for evening digest
+      const groupKey = sender;
+      if (!state.internalPendingAsks[groupKey]) state.internalPendingAsks[groupKey] = [];
+      state.internalPendingAsks[groupKey].push({
+        asker: sender,
+        ask: text,
+        time: Date.now(),
+        respondents: [],
+        tagged: analysis.taggedPerson,
+      });
+    }
+
+    // Track unanswered client messages
+    if (!isInternal && !taggedMe) {
+      const isTenonSender = isTenonTeam(sender, sender);
+      if (!isTenonSender) {
+        state.unansweredClientMessages[sender] = {
+          messageTime: Date.now(),
+          messageText: text,
+          senderName: sender,
+          analysis,
+        };
+      } else {
+        // Team replied - clear unanswered
+        delete state.unansweredClientMessages[sender];
+      }
+    }
+
+  } catch (err) {
+    console.error("Tasker message error:", err.message);
+  }
+});
+
 // ─── HEALTH CHECK ─────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
   res.json({
